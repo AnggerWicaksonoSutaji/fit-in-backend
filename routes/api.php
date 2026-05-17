@@ -16,6 +16,9 @@ Route::options('/{any}', function() {
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
 
+// Midtrans Webhook (harus public agar bisa diakses oleh server Midtrans)
+Route::post('/payment/webhook', [PaymentController::class, 'webhook']);
+
 // Protected routes (memerlukan token Sanctum)
 Route::middleware('auth:sanctum')->group(function () {
     // Auth

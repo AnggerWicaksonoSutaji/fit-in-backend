@@ -7,7 +7,8 @@ use App\Models\PaketLangganan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
-
+use Midtrans\Config;
+use Midtrans\Snap;
 class PaymentController extends Controller
 {
     // Daftar paket
@@ -29,7 +30,6 @@ class PaymentController extends Controller
         return response()->json($pakets);
     }
 
-    // Proses pembayaran (simulasi/dummy)
     public function checkout(Request $request)
     {
         $request->validate([
@@ -39,24 +39,111 @@ class PaymentController extends Controller
         $user  = Auth::user();
         $paket = PaketLangganan::find($request->paket_id);
 
-        // Buat transaksi
+        // Buat transaksi dengan status pending
         $transaction = Transaction::create([
             'user_id'            => $user->id,
             'paket_langganan_id' => $paket->id,
             'tgl_bayar'          => Carbon::today(),
-            'status_bayar'       => 'paid',       // simulasi langsung paid
-            'status_langganan'   => 'active',
-            'expired_at'         => Carbon::today()->addDays($paket->durasi_hari),
+            'status_bayar'       => 'pending',    // Set ke pending
+            'status_langganan'   => 'inactive',   // Set ke inactive sampai dibayar
+            'expired_at'         => null,
         ]);
 
-        // Update role user jadi premium (pakai User::find untuk memastikan save ke DB)
-        \App\Models\User::where('id', $user->id)->update(['role' => 'premium']);
+        // Konfigurasi Midtrans
+        Config::$serverKey = env('MIDTRANS_SERVER_KEY');
+        Config::$isProduction = env('MIDTRANS_IS_PRODUCTION', false);
+        Config::$isSanitized = env('MIDTRANS_IS_SANITIZED', true);
+        Config::$is3ds = env('MIDTRANS_IS_3DS', true);
 
-        return response()->json([
-            'message'     => 'Pembayaran berhasil (simulasi)',
-            'transaction' => $transaction,
-            'user'        => \App\Models\User::find($user->id),
-        ]);
+        $params = [
+            'transaction_details' => [
+                'order_id' => 'FITIN-' . $transaction->id . '-' . time(),
+                'gross_amount' => $paket->harga,
+            ],
+            'customer_details' => [
+                'first_name' => $user->name,
+                'email' => $user->email,
+            ],
+            'item_details' => [
+                [
+                    'id' => $paket->id,
+                    'price' => $paket->harga,
+                    'quantity' => 1,
+                    'name' => 'Paket Premium ' . $paket->nama_paket,
+                ]
+            ]
+        ];
+
+        try {
+            $snapToken = Snap::getSnapToken($params);
+
+            return response()->json([
+                'message'     => 'Token Midtrans berhasil di-generate',
+                'snap_token'  => $snapToken,
+                'transaction' => $transaction,
+                'user'        => \App\Models\User::find($user->id),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Webhook Midtrans
+    public function webhook(Request $request)
+    {
+        Config::$serverKey = env('MIDTRANS_SERVER_KEY');
+        Config::$isProduction = env('MIDTRANS_IS_PRODUCTION', false);
+        
+        try {
+            $notification = new \Midtrans\Notification();
+        } catch (\Exception $e) {
+            // Jika testing manual tanpa API Midtrans yang asli, ini bisa error
+            // Tapi dalam production/sandbox asli, ini akan berfungsi
+            return response()->json(['message' => 'Invalid notification'], 400);
+        }
+
+        $transactionStatus = $notification->transaction_status;
+        $orderId = $notification->order_id; // contoh: FITIN-5-168923010
+        
+        // Ekstrak ID transaksi kita
+        $orderIdParts = explode('-', $orderId);
+        $transactionId = $orderIdParts[1] ?? null;
+
+        if (!$transactionId) {
+            return response()->json(['message' => 'Invalid order ID'], 400);
+        }
+
+        $transaction = Transaction::find($transactionId);
+
+        if (!$transaction) {
+            return response()->json(['message' => 'Transaction not found'], 404);
+        }
+
+        if ($transactionStatus == 'settlement' || $transactionStatus == 'capture') {
+            // Pembayaran berhasil
+            $transaction->update([
+                'status_bayar'     => 'paid',
+                'status_langganan' => 'active',
+                'expired_at'       => Carbon::today()->addDays($transaction->paket->durasi_hari ?? 30),
+            ]);
+
+            // Update role user menjadi premium
+            \App\Models\User::where('id', $transaction->user_id)->update(['role' => 'premium']);
+
+        } else if ($transactionStatus == 'cancel' || $transactionStatus == 'deny' || $transactionStatus == 'expire') {
+            // Pembayaran gagal/kadaluarsa
+            $transaction->update([
+                'status_bayar'     => 'failed',
+                'status_langganan' => 'inactive',
+            ]);
+        } else if ($transactionStatus == 'pending') {
+            // Pembayaran masih tertunda
+            $transaction->update([
+                'status_bayar'     => 'pending',
+            ]);
+        }
+
+        return response()->json(['message' => 'Notification received and processed']);
     }
 
     // Cek status premium user
