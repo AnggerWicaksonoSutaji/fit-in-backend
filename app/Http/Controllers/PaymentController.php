@@ -45,15 +45,23 @@ class PaymentController extends Controller
             'paket_langganan_id' => $paket->id,
             'tgl_bayar'          => Carbon::today(),
             'status_bayar'       => 'pending',    // Set ke pending
-            'status_langganan'   => 'inactive',   // Set ke inactive sampai dibayar
+            'status_langganan'   => 'expired',   // Set ke expired sampai dibayar
             'expired_at'         => null,
         ]);
-
-        // Konfigurasi Midtrans
-        Config::$serverKey = env('MIDTRANS_SERVER_KEY');
-        Config::$isProduction = env('MIDTRANS_IS_PRODUCTION', false);
-        Config::$isSanitized = env('MIDTRANS_IS_SANITIZED', true);
-        Config::$is3ds = env('MIDTRANS_IS_3DS', true);
+// Set your Merchant Server Key
+        \Midtrans\Config::$serverKey = config("midtrans.serverkey");
+        // Set to Development/Sandbox Environment (default). Set to true for Production Environment (accept real transaction).
+        \Midtrans\Config::$isProduction = false;
+        // Set sanitization on (default)
+        \Midtrans\Config::$isSanitized = true;
+        // Set 3DS transaction for credit card to true
+        \Midtrans\Config::$is3ds = true;
+        // Bypass SSL certificate check on local environment
+        \Midtrans\Config::$curlOptions = [
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_HTTPHEADER => ['X-Midtrans-Bypass: true'] // Mencegah bug 'Undefined array key 10023' di SDK
+        ];
 
         $params = [
             'transaction_details' => [
@@ -134,7 +142,7 @@ class PaymentController extends Controller
             // Pembayaran gagal/kadaluarsa
             $transaction->update([
                 'status_bayar'     => 'failed',
-                'status_langganan' => 'inactive',
+                'status_langganan' => 'expired',
             ]);
         } else if ($transactionStatus == 'pending') {
             // Pembayaran masih tertunda
