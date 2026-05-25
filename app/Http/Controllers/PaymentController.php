@@ -168,4 +168,31 @@ class PaymentController extends Controller
             'transaction' => $lastTransaction,
         ]);
     }
+
+    // Update manual status (untuk keperluan lokal/testing karena webhook butuh IP public)
+    public function success(Request $request)
+    {
+        $request->validate([
+            'transaction_id' => 'required'
+        ]);
+
+        $transaction = Transaction::find($request->transaction_id);
+        if (!$transaction) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        if ($transaction->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $transaction->update([
+            'status_bayar'     => 'paid',
+            'status_langganan' => 'active',
+            'expired_at'       => Carbon::today()->addDays($transaction->paket->durasi_hari ?? 30),
+        ]);
+
+        \App\Models\User::where('id', $transaction->user_id)->update(['role' => 'premium']);
+
+        return response()->json(['message' => 'Success updated']);
+    }
 }
