@@ -31,6 +31,12 @@ class User extends Authenticatable
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | RELATION
+    |--------------------------------------------------------------------------
+    */
+
     public function profile()
     {
         return $this->hasOne(UserProfile::class);
@@ -51,8 +57,24 @@ class User extends Authenticatable
         return $this->hasMany(Transaction::class);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ROLE CHECK
+    |--------------------------------------------------------------------------
+    */
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
     public function isPremium(): bool
     {
         return $this->role === 'premium';
+    }
+
+    public function isUser(): bool
+    {
+        return $this->role === 'user';
     }
 }
