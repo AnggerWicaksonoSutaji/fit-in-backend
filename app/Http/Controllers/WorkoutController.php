@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\UserActivity;
 use App\Models\WorkoutPlan;
 use App\Models\Exercise;
 use Illuminate\Http\Request;
@@ -52,12 +53,16 @@ class WorkoutController extends Controller
 
         // Distribusi latihan per hari (skip Minggu = rest)
         foreach ($days as $i => $day) {
-            if ($day === 'Minggu') continue; // Rest day
+
+            if ($day === 'Minggu') {
+                continue; // Rest day
+            }
 
             // Ambil 2-3 exercise random untuk setiap hari
             $dailyExercises = $exercises->random(min(3, $exercises->count()));
 
             foreach ($dailyExercises as $exercise) {
+
                 WorkoutPlan::create([
                     'user_id'      => $user->id,
                     'exercise_id'  => $exercise->id,
@@ -78,13 +83,23 @@ class WorkoutController extends Controller
     }
 
     // Tandai workout selesai
-    public function markDone($id)
+    public function markDone(Request $request, $id)
     {
         $plan = WorkoutPlan::where('id', $id)
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
-        $plan->update(['is_done' => true]);
+        $plan->update([
+            'is_done' => true
+        ]);
+
+        // Simpan log activity workout selesai
+        UserActivity::create([
+            'user_id'     => $request->user()->id,
+            'activity'    => 'workout_done',
+            'description' => 'Menyelesaikan workout',
+            'ip_address'  => $request->ip(),
+        ]);
 
         return response()->json([
             'message' => 'Workout ditandai selesai',
@@ -96,10 +111,17 @@ class WorkoutController extends Controller
     public function stats()
     {
         $userId = Auth::id();
+
         $total    = WorkoutPlan::where('user_id', $userId)->count();
-        $done     = WorkoutPlan::where('user_id', $userId)->where('is_done', true)->count();
+        $done     = WorkoutPlan::where('user_id', $userId)
+                        ->where('is_done', true)
+                        ->count();
+
         $calories = $done * 200; // estimasi 200 kcal per workout
-        $goalPct  = $total > 0 ? round(($done / $total) * 100) : 0;
+
+        $goalPct  = $total > 0
+            ? round(($done / $total) * 100)
+            : 0;
 
         return response()->json([
             'workouts' => $done,

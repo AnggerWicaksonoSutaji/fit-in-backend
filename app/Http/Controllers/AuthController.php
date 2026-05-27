@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\UserActivity;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,6 +25,14 @@ class AuthController extends Controller
             'role'     => 'free',
         ]);
 
+        // Simpan log activity register
+        UserActivity::create([
+            'user_id'     => $user->id,
+            'activity'    => 'register',
+            'description' => 'User baru mendaftar',
+            'ip_address'  => $request->ip(),
+        ]);
+
         $token = $user->createToken('fitinToken')->plainTextToken;
 
         return response()->json([
@@ -41,7 +50,9 @@ class AuthController extends Controller
         ]);
 
         // Coba login pakai email atau username
-        $loginField = filter_var($request->username, FILTER_VALIDATE_EMAIL) ? 'email' : 'name';
+        $loginField = filter_var($request->username, FILTER_VALIDATE_EMAIL)
+            ? 'email'
+            : 'name';
 
         $user = User::where($loginField, $request->username)->first();
 
@@ -53,6 +64,14 @@ class AuthController extends Controller
 
         $token = $user->createToken('fitinToken')->plainTextToken;
 
+        // Simpan log activity login
+        UserActivity::create([
+            'user_id'     => $user->id,
+            'activity'    => 'login',
+            'description' => 'User login ke aplikasi',
+            'ip_address'  => $request->ip(),
+        ]);
+
         return response()->json([
             'message' => 'Login berhasil',
             'token'   => $token,
@@ -62,6 +81,14 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        // Simpan log activity logout
+        UserActivity::create([
+            'user_id'     => $request->user()->id,
+            'activity'    => 'logout',
+            'description' => 'User logout',
+            'ip_address'  => $request->ip(),
+        ]);
+
         $request->user()->tokens()->delete();
 
         return response()->json([
@@ -73,6 +100,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
         $user->load(['profile', 'program']);
+
         return response()->json($user);
     }
 }

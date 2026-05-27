@@ -11,14 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-
-            $table->enum('role', [
-                'free',
-                'premium',
-                'admin'
-            ])->default('free')->after('password');
-
+        Schema::create('user_activities', function (Blueprint $table) {
+            $table->id();
+            $table->timestamps();
         });
     }
 
@@ -27,10 +22,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-
-            $table->dropColumn('role');
-
-        });
+        Schema::dropIfExists('user_activities');
     }
 };
