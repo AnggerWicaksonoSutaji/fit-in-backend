@@ -6,9 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\WorkoutController;
-use App\Http\Controllers\Admin\AdminController;
-use App\Http\Controllers\Admin\WorkoutManagementController;
-use App\Http\Controllers\Admin\ActivityController;
+use App\Http\Controllers\AdminController;
 
 /*
 |--------------------------------------------------------------------------
@@ -83,9 +81,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payment/success',  [PaymentController::class, 'success']);
     Route::get('/payment/status',    [PaymentController::class, 'status']);
 
-    Route::get('/workouts',              [WorkoutController::class, 'index']);
-    Route::post('/workouts/generate',    [WorkoutController::class, 'generate']);
-    Route::patch('/workouts/{id}/done',  [WorkoutController::class, 'markDone']);
-    Route::get('/workouts/stats',        [WorkoutController::class, 'stats']);
+    // Workout
+    Route::get('/workouts',          [WorkoutController::class, 'index']);
+    Route::post('/workouts/generate', [WorkoutController::class, 'generate']);
+    Route::patch('/workouts/{id}/done', [WorkoutController::class, 'markDone']);
+    Route::get('/workouts/stats',    [WorkoutController::class, 'stats']);
 
+    // Admin
+    Route::get('/admin/dashboard',   [AdminController::class, 'dashboard']);
+    Route::get('/admin/users',       [AdminController::class, 'users']);
 });
