@@ -13,6 +13,10 @@ return new class extends Migration
     {
         Schema::create('user_activities', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('activity');
+            $table->string('description')->nullable();
+            $table->string('ip_address')->nullable();
             $table->timestamps();
         });
     }
