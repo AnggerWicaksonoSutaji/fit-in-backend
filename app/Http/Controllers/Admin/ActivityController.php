@@ -5,31 +5,70 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\UserActivity;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class ActivityController extends Controller
 {
-    // GET semua aktivitas user
+    // GET semua aktivitas user (dengan field flat: user_name, user_email, user_role)
     public function index(Request $request)
     {
-        $activities = UserActivity::with('user:id,name,email')
+        $activities = UserActivity::with('user:id,name,email,role')
             ->latest()
             ->limit(100)
-            ->get();
+            ->get()
+            ->map(function ($act) {
+                return [
+                    'id'          => $act->id,
+                    'activity'    => $act->activity,
+                    'description' => $act->description,
+                    'ip_address'  => $act->ip_address,
+                    'time'        => $act->created_at
+                        ? $act->created_at->diffForHumans()
+                        : '-',
+                    'user_name'   => $act->user->name  ?? 'Unknown',
+                    'user_email'  => $act->user->email ?? '-',
+                    'user_role'   => $act->user->role  ?? 'free',
+                ];
+            });
 
         return response()->json($activities);
     }
 
-    // GET statistik aktivitas
+    // GET statistik aktivitas (today_logins, today_workouts, new_registers, recent_activities, total_activities)
     public function stats(Request $request)
     {
-        $totalLogins   = UserActivity::where('activity', 'login')->count();
-        $totalLogouts  = UserActivity::where('activity', 'logout')->count();
-        $totalRegisters = UserActivity::where('activity', 'register')->count();
+        $today = Carbon::today();
+
+        $todayLogins    = UserActivity::where('activity', 'login')
+                            ->whereDate('created_at', $today)->count();
+        $todayWorkouts  = UserActivity::where('activity', 'workout_done')
+                            ->whereDate('created_at', $today)->count();
+        $newRegisters   = UserActivity::where('activity', 'register')
+                            ->whereDate('created_at', $today)->count();
+        $totalActivities = UserActivity::count();
+
+        // 10 aktivitas terbaru untuk dashboard
+        $recentActivities = UserActivity::with('user:id,name,role')
+            ->latest()
+            ->limit(10)
+            ->get()
+            ->map(function ($act) {
+                return [
+                    'user'     => $act->user->name ?? 'Unknown',
+                    'role'     => $act->user->role ?? 'free',
+                    'activity' => $act->activity,
+                    'time'     => $act->created_at
+                        ? $act->created_at->diffForHumans()
+                        : '-',
+                ];
+            });
 
         return response()->json([
-            'total_logins'    => $totalLogins,
-            'total_logouts'   => $totalLogouts,
-            'total_registers' => $totalRegisters,
+            'today_logins'       => $todayLogins,
+            'today_workouts'     => $todayWorkouts,
+            'new_registers'      => $newRegisters,
+            'total_activities'   => $totalActivities,
+            'recent_activities'  => $recentActivities,
         ]);
     }
 }

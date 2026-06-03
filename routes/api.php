@@ -80,6 +80,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/profile', [ProfileController::class, 'store']);
     Route::get('/profile',  [ProfileController::class, 'show']);
 
+    Route::get('/user/sync-stats', [WorkoutController::class, 'getStats']);
+    Route::post('/user/sync-stats', [WorkoutController::class, 'updateStats']);
+
     Route::get('/packages',          [PaymentController::class, 'packages']);
     Route::post('/payment/checkout', [PaymentController::class, 'checkout']);
     Route::post('/payment/success',  [PaymentController::class, 'success']);

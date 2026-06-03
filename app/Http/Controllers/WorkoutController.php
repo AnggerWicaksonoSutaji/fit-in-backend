@@ -107,27 +107,56 @@ class WorkoutController extends Controller
         ]);
     }
 
-    // Stats: hitung workout selesai, kalori, dll
-    public function stats()
+    // Fetch user stats from database
+    public function getStats()
     {
         $userId = Auth::id();
+        $stat = \App\Models\UserStat::firstOrCreate(
+            ['user_id' => $userId],
+            [
+                'workouts' => 0,
+                'calories' => 0,
+                'streak' => 0,
+                'today_sessions' => 0,
+                'today_calories' => 0,
+                'daily_history' => []
+            ]
+        );
 
-        $total    = WorkoutPlan::where('user_id', $userId)->count();
-        $done     = WorkoutPlan::where('user_id', $userId)
-                        ->where('is_done', true)
-                        ->count();
+        return response()->json($stat);
+    }
 
-        $calories = $done * 200; // estimasi 200 kcal per workout
+    // Sync user stats from frontend
+    public function updateStats(Request $request)
+    {
+        $userId = Auth::id();
+        
+        $request->validate([
+            'workouts' => 'required|integer',
+            'calories' => 'required|integer',
+            'streak' => 'required|integer',
+            'today_sessions' => 'required|integer',
+            'today_calories' => 'required|integer',
+            'last_workout_date' => 'nullable|date',
+            'daily_history' => 'nullable|array'
+        ]);
 
-        $goalPct  = $total > 0
-            ? round(($done / $total) * 100)
-            : 0;
+        $stat = \App\Models\UserStat::updateOrCreate(
+            ['user_id' => $userId],
+            [
+                'workouts' => $request->workouts,
+                'calories' => $request->calories,
+                'streak' => $request->streak,
+                'today_sessions' => $request->today_sessions,
+                'today_calories' => $request->today_calories,
+                'last_workout_date' => $request->last_workout_date,
+                'daily_history' => $request->daily_history ?? []
+            ]
+        );
 
         return response()->json([
-            'workouts' => $done,
-            'calories' => $calories,
-            'streak'   => $done, // simplified streak
-            'goalPct'  => $goalPct,
+            'message' => 'Stats synced successfully',
+            'stat' => $stat
         ]);
     }
 }
