@@ -20,9 +20,9 @@ class PaymentController extends Controller
         if ($pakets->isEmpty()) {
             PaketLangganan::insert([
                 ['nama_paket' => 'Bulanan',   'harga' => 49000,  'durasi_hari' => 30,  'created_at' => now(), 'updated_at' => now()],
-                ['nama_paket' => '3 Bulan',   'harga' => 119000, 'durasi_hari' => 90,  'created_at' => now(), 'updated_at' => now()],
+                ['nama_paket' => '3 Bulan',   'harga' => 129000, 'durasi_hari' => 90,  'created_at' => now(), 'updated_at' => now()],
                 ['nama_paket' => '6 Bulan',   'harga' => 199000, 'durasi_hari' => 180, 'created_at' => now(), 'updated_at' => now()],
-                ['nama_paket' => 'Tahunan',   'harga' => 349000, 'durasi_hari' => 365, 'created_at' => now(), 'updated_at' => now()],
+                ['nama_paket' => 'Tahunan',   'harga' => 449000, 'durasi_hari' => 365, 'created_at' => now(), 'updated_at' => now()],
             ]);
             $pakets = PaketLangganan::all();
         }

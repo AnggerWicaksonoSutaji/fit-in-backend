@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
@@ -102,5 +103,46 @@ class AuthController extends Controller
         $user->load(['profile', 'program']);
 
         return response()->json($user);
+    }
+
+    public function updateUsername(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'username' => [
+                'required',
+                'string',
+                'max:255',
+                'min:3',
+                // Exclude current user so they can "re-save" their own name
+                Rule::unique('users', 'name')->ignore($user->id),
+            ],
+        ], [
+            'username.unique' => 'Username sudah digunakan oleh pengguna lain.',
+            'username.required' => 'Username tidak boleh kosong.',
+            'username.min' => 'Username minimal 3 karakter.',
+            'username.max' => 'Username maksimal 255 karakter.',
+        ]);
+
+        $user->name = $request->username;
+        $user->save();
+
+        // Log activity (non-fatal if it fails)
+        try {
+            UserActivity::create([
+                'user_id'     => $user->id,
+                'activity'    => 'update_username',
+                'description' => 'User mengubah username menjadi: ' . $request->username,
+                'ip_address'  => $request->ip(),
+            ]);
+        } catch (\Exception $e) {
+            // Log gagal, tapi username tetap tersimpan
+        }
+
+        return response()->json([
+            'message' => 'Username berhasil diubah',
+            'user'    => $user
+        ]);
     }
 }

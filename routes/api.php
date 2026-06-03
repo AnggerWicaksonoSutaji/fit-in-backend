@@ -6,7 +6,10 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\WorkoutController;
-use App\Http\Controllers\AdminController;
+use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\WorkoutManagementController;
+use App\Http\Controllers\Admin\ActivityController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -72,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user',    [AuthController::class, 'user']);
+    Route::patch('/user/username', [AuthController::class, 'updateUsername']);
 
     Route::post('/profile', [ProfileController::class, 'store']);
     Route::get('/profile',  [ProfileController::class, 'show']);
