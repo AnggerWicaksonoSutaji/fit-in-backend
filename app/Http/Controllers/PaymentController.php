@@ -65,7 +65,7 @@ class PaymentController extends Controller
 
         $params = [
             'transaction_details' => [
-                'order_id' => 'FITIN-' . $transaction->id . '-' . time(),
+                'order_id' => 'FITIN-' . $transaction->id,
                 'gross_amount' => $paket->harga,
             ],
             'customer_details' => [
@@ -111,7 +111,7 @@ class PaymentController extends Controller
         }
 
         $transactionStatus = $notification->transaction_status;
-        $orderId = $notification->order_id; // contoh: FITIN-5-168923010
+        $orderId = $notification->order_id; // contoh: FITIN-5
         
         // Ekstrak ID transaksi kita
         $orderIdParts = explode('-', $orderId);
@@ -158,6 +158,39 @@ class PaymentController extends Controller
     public function status()
     {
         $user = Auth::user();
+
+        // ── ACTIVE POLLING UNTUK LINGKUNGAN LOKAL ──
+        $pendingTransaction = Transaction::where('user_id', $user->id)
+            ->where('status_bayar', 'pending')
+            ->latest()
+            ->first();
+
+        if ($pendingTransaction) {
+            try {
+                \Midtrans\Config::$serverKey = config("midtrans.serverkey") ?? env('MIDTRANS_SERVER_KEY');
+                \Midtrans\Config::$isProduction = env('MIDTRANS_IS_PRODUCTION', false);
+                $midtransStatus = \Midtrans\Transaction::status('FITIN-' . $pendingTransaction->id);
+                
+                $tStatus = $midtransStatus->transaction_status ?? null;
+                if ($tStatus == 'settlement' || $tStatus == 'capture') {
+                    $pendingTransaction->update([
+                        'status_bayar'     => 'paid',
+                        'status_langganan' => 'active',
+                        'expired_at'       => Carbon::today()->addDays($pendingTransaction->paketLangganan->durasi_hari ?? 30),
+                    ]);
+                    \App\Models\User::where('id', $pendingTransaction->user_id)->update(['role' => 'premium']);
+                    $user->role = 'premium';
+                } else if ($tStatus == 'cancel' || $tStatus == 'deny' || $tStatus == 'expire') {
+                    $pendingTransaction->update([
+                        'status_bayar'     => 'failed',
+                        'status_langganan' => 'expired',
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Abaikan error jika API gagal
+            }
+        }
+
         $lastTransaction = Transaction::where('user_id', $user->id)
             ->where('status_langganan', 'active')
             ->latest()
